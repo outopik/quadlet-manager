@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+
+    <script src="../base1/cockpit.js"></script>
+    <link rel="stylesheet" href="plugin.css">
+
+    <title>Quadlet</title>
+</head>
+
+<body>
+
+<main class="pf-c-page__main-section">
+
+    <div class="plugin-card">
+
+        <header class="plugin-header">
+            <div class="brand-lockup">
+                <img
+                    class="podman-logo"
+                    src="Podman-logo-orig.png"
+                    alt="Podman">
+                <div>
+                    <p class="eyebrow">GESTION DES CONTENEURS</p>
+                    <h1>Quadlet Manager</h1>
+                    <p class="plugin-subtitle">Unités rootless des utilisateurs</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button
+                    id="refresh-btn"
+                    class="pf-c-button pf-m-secondary action-button"
+                    type="button">
+                    <span class="button-icon" aria-hidden="true">↻</span>
+                    Actualiser
+                </button>
+                <button
+                    id="update-all-btn"
+                    class="pf-c-button pf-m-secondary action-button"
+                    type="button">
+                    <span class="button-icon" aria-hidden="true">⬆</span>
+                    Update all
+                </button>
+            </div>
+        </header>
+
+
+        <!-- Liste des fichiers -->
+        <section id="list-panel" class="plugin-body">
+
+            <div id="status" class="status-message"></div>
+
+            <div class="section-intro">
+                <div>
+                    <p class="section-kicker">ESPACE DE TRAVAIL</p>
+                    <h2>Fichiers Quadlet</h2>
+                    <p>Consultez l'état des unités et modifiez leur configuration.</p>
+                </div>
+                <div class="status-key" aria-label="Légende des statuts">
+                    <span><i class="status-dot status-dot-active"></i>Actif</span>
+                    <span><i class="status-dot status-dot-inactive"></i>Inactif</span>
+                    <span><i class="status-dot status-dot-failed"></i>Échec</span>
+                </div>
+            </div>
+
+            <section class="rootless-panel" aria-labelledby="rootless-title">
+                <div class="rootless-panel-header">
+                    <div>
+                        <p class="section-kicker">ACCÈS UTILISATEUR</p>
+                        <h2 id="rootless-title">Utilisateurs rootless</h2>
+                    </div>
+                    <span class="rootless-badge">Podman</span>
+                </div>
+                <div id="rootless-users" class="rootless-users"></div>
+            </section>
+
+            <div id="users-list"></div>
+
+        </section>
+
+
+        <!-- Éditeur -->
+        <section id="editor-panel" class="editor-panel hidden">
+
+            <header class="editor-header">
+
+                <div class="editor-title">
+                    <p class="section-kicker">CONFIGURATION</p>
+                    <h2>Éditer</h2>
+                    <p id="editor-filename"></p>
+                </div>
+
+                <button
+                    id="close-btn"
+                    class="pf-c-button pf-m-secondary action-button"
+                    type="button">
+                    <span class="button-icon" aria-hidden="true">←</span>
+                    Fermer
+                </button>
+
+            </header>
+
+
+            <div class="editor-actions">
+
+                <button
+                    id="save-btn"
+                    class="pf-c-button pf-m-primary action-button"
+                    type="button">
+                    <span class="button-icon" aria-hidden="true">✓</span>
+                    Enregistrer
+                </button>
+
+                <button
+                    id="restart-btn"
+                    class="pf-c-button pf-m-secondary action-button"
+                    type="button">
+                    <span class="button-icon" aria-hidden="true">↻</span>
+                    Enregistrer et redémarrer
+                </button>
+
+            </div>
+
+
+            <div class="editor-container">
+
+                <textarea
+                    id="editor"
+                    spellcheck="false"
+                    aria-label="Contenu du fichier Quadlet"></textarea>
+
+            </div>
+
+
+            <footer class="editor-footer">
+                <span id="editor-msg"></span>
+            </footer>
+
+        </section>
+
+    </div>
+
+</main>
+<script src="quadlet-manager.js"></script>
+</body>
+</html>

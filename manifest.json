@@ -1,0 +1,14 @@
+{
+    "name": "quadlet-manager",
+    "version": "0.1.5",
+    "requires": {
+        "cockpit": "300"
+    },
+    "menu": {
+        "index": {
+            "label": "Quadlet Manager",
+            "order": 51,
+            "docs": []
+        }
+    }
+}
