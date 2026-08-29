@@ -1,6 +1,8 @@
 
 "use strict";
 
+const README_TEMPLATE_PATH = "/home/nico/Documents/quadlet-manager/README.md";
+
 const DISCOVER_SCRIPT = `
 for d in /home/*/; do
     u=$(basename "$d")
@@ -84,12 +86,89 @@ let currentFileUid = null;
 let currentFileGid = null;
 let currentFileMode = null;
 
+const getElement = id => document.getElementById(id);
+
+function isContainerFile(file) {
+    return String(file || "").toLowerCase().endsWith(".container");
+}
+
+function normalizeStatus(status) {
+    return String(status || "").trim().toLowerCase();
+}
+
+function createActionButton({
+    text,
+    className = "file-action-button",
+    title = "",
+    onClick
+}) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = className;
+    btn.textContent = text;
+
+    if (title) {
+        btn.title = title;
+    }
+
+    if (onClick) {
+        btn.addEventListener("click", onClick);
+    }
+
+    return btn;
+}
+
+function createDataCell(text, className = "") {
+    const td = document.createElement("td");
+    td.textContent = text;
+
+    if (className) {
+        td.className = className;
+    }
+
+    return td;
+}
+
+function runWithSuperuser(args, extraOptions = {}) {
+    return cockpit.spawn(args, {
+        superuser: "require",
+        err: "message",
+        ...extraOptions
+    });
+}
+
+function runScriptWithSuperuser(script, args = []) {
+    return cockpit.script(script, args, {
+        superuser: "require",
+        err: "message"
+    });
+}
+
+function runAsUser(user, commandArgs) {
+    return runWithSuperuser([
+        "machinectl",
+        "shell",
+        `${user}@`,
+        ...commandArgs
+    ]);
+}
+
+function getUserId(user) {
+    return runWithSuperuser(["/usr/bin/id", "-u", user])
+        .then(output => output.trim());
+}
+
+function getUserGid(user) {
+    return runWithSuperuser(["/usr/bin/id", "-g", user])
+        .then(output => output.trim());
+}
+
 /* ============================================================
  * STATUT
  * ============================================================ */
 
 function setStatus(text) {
-    document.getElementById("status").textContent = text;
+    getElement("status").textContent = text;
 }
 
 
@@ -124,14 +203,122 @@ function loadUsers() {
  * AFFICHAGE
  * ============================================================ */
 
-function renderUsers(output) {
-
-    const rows = output
+function parseDiscoverRows(output) {
+    return output
         .trim()
         .split("\n")
         .filter(Boolean)
         .map(line => line.split("\t"));
+}
 
+function groupUserRows(rows) {
+    const grouped = {};
+
+    rows.forEach(([user, file, svc, status, uid, gid]) => {
+        if (user === "__ROOTLESS__") {
+            return;
+        }
+
+        if (user === "__QUADLET_USER__") {
+            if (!grouped[file]) {
+                grouped[file] = [];
+            }
+            return;
+        }
+
+        if (!grouped[user]) {
+            grouped[user] = [];
+        }
+
+        grouped[user].push({
+            file,
+            svc,
+            status,
+            uid,
+            gid
+        });
+    });
+
+    return grouped;
+}
+
+function renderUserSection(user, entries) {
+    const section = document.createElement("div");
+    section.className = "user-block";
+
+    const heading = document.createElement("h3");
+    heading.textContent = user;
+
+    const userHeader = document.createElement("div");
+    userHeader.className = "user-header";
+    userHeader.appendChild(heading);
+    section.appendChild(userHeader);
+
+    const createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = "file-action-button";
+    createBtn.textContent = "Créer un fichier";
+    createBtn.addEventListener("click", () => {
+        createFile(user);
+    });
+    section.appendChild(createBtn);
+
+    const table = document.createElement("table");
+
+    entries.forEach(({ file, svc, status, uid, gid }) => {
+        if (svc) {
+            knownServices.push({
+                user,
+                file,
+                svc
+            });
+        }
+
+        const tr = document.createElement("tr");
+
+        tr.appendChild(createDataCell(file));
+        tr.appendChild(createDataCell(`${uid}:${gid}`, "file-owner"));
+        tr.appendChild(createDataCell(status, `status status-${status}`));
+
+        const tdBtn = document.createElement("td");
+
+        tdBtn.appendChild(createActionButton({
+            text: "Éditer",
+            onClick: () => openEditor(user, file, svc)
+        }));
+
+        if (isContainerFile(file)) {
+            const normalizedStatus = normalizeStatus(status);
+            const isActive = normalizedStatus === "active";
+
+            tdBtn.appendChild(createActionButton({
+                text: isActive ? "Stop" : "Start",
+                title: isActive
+                    ? "Arrêter ce conteneur"
+                    : "Démarrer ce conteneur",
+                onClick: () => setContainerState(
+                    user,
+                    file,
+                    isActive ? "stop" : "start"
+                )
+            }));
+        }
+
+        tdBtn.appendChild(createActionButton({
+            text: "Supprimer",
+            onClick: () => deleteFile(user, file)
+        }));
+
+        tr.appendChild(tdBtn);
+        table.appendChild(tr);
+    });
+
+    section.appendChild(table);
+    return section;
+}
+
+function renderUsers(output) {
+    const rows = parseDiscoverRows(output);
     const rootlessUsers = rows
         .filter(([kind]) => kind === "__ROOTLESS__")
         .map(([, user]) => user)
@@ -139,241 +326,26 @@ function renderUsers(output) {
 
     renderRootlessUsers(rootlessUsers);
 
-
-    const grouped = {};
-
-
-    rows.forEach(
-        ([user, file, svc, status, uid, gid]) => {
-
-            if (user === "__ROOTLESS__") {
-                return;
-            }
-
-            if (user === "__QUADLET_USER__") {
-                if (!grouped[file]) {
-                    grouped[file] = [];
-                }
-                return;
-            }
-
-            if (!grouped[user]) {
-                grouped[user] = [];
-            }
-
-            grouped[user].push({
-                file: file,
-                svc: svc,
-                status: status,
-                uid: uid,
-                gid: gid
-            });
-
-        }
-    );
-
-
-    const container =
-        document.getElementById("users-list");
-
+    const grouped = groupUserRows(rows);
+    const container = getElement("users-list");
     container.innerHTML = "";
+
     knownUsers = Object.keys(grouped).sort();
     knownServices = [];
 
-
     if (Object.keys(grouped).length === 0) {
-
         container.textContent =
             "Aucun fichier trouvé dans les répertoires Quadlet des utilisateurs.";
 
         setStatus("");
-
         return;
     }
 
     Object.keys(grouped)
         .sort()
         .forEach(user => {
-
-            const section =
-                document.createElement("div");
-
-            section.className =
-                "user-block";
-
-            const h =
-                document.createElement("h3");
-
-            h.textContent = user;
-
-            const userHeader = document.createElement("div");
-            userHeader.className = "user-header";
-            userHeader.appendChild(h);
-            section.appendChild(userHeader);
-
-            const createBtn = document.createElement("button");
-            createBtn.type = "button";
-            createBtn.className = "file-action-button";
-            createBtn.textContent = "Créer un fichier";
-            createBtn.addEventListener("click", () => {
-                createFile(user);
-            });
-            section.appendChild(createBtn);
-
-            const table =
-                document.createElement("table");
-
-            grouped[user].forEach(
-                ({ file, svc, status, uid, gid }) => {
-
-                    if (svc) {
-                        knownServices.push({
-                            user: user,
-                            file: file,
-                            svc: svc
-                        });
-                    }
-
-                    const tr =
-                        document.createElement("tr");
-
-
-                    /* ------------------------------
-                     * Fichier
-                     * ------------------------------ */
-
-                    const tdFile =
-                        document.createElement("td");
-
-                    tdFile.textContent =
-                        file;
-
-                    tr.appendChild(tdFile);
-
-
-                    /* ------------------------------
-                     * UID:GID
-                     * ------------------------------ */
-
-                    const tdOwner =
-                        document.createElement("td");
-
-                    tdOwner.textContent =
-                        `${uid}:${gid}`;
-
-                    tdOwner.className =
-                        "file-owner";
-
-                    tr.appendChild(tdOwner);
-
-
-                    /* ------------------------------
-                     * Statut
-                     * ------------------------------ */
-
-                    const tdStatus =
-                        document.createElement("td");
-
-                    tdStatus.textContent =
-                        status;
-
-                    tdStatus.className =
-                        "status status-" + status;
-
-                    tr.appendChild(tdStatus);
-
-                    /* ------------------------------
-                     * Éditer
-                     * ------------------------------ */
-
-                    const tdBtn =
-                        document.createElement("td");
-
-
-                    const btn =
-                        document.createElement("button");
-
-                    btn.type = "button";
-                    btn.className = "file-action-button";
-                    btn.textContent = "Éditer";
-
-
-                    btn.addEventListener(
-                        "click",
-                        () => {
-
-                            openEditor(
-                                user,
-                                file,
-                                svc
-                            );
-
-                        }
-                    );
-
-
-                    tdBtn.appendChild(btn);
-
-
-                    if (file.toLowerCase().endsWith(".container")) {
-
-                        const serviceAction = document.createElement("button");
-                        const normalizedStatus =
-                            String(status).trim().toLowerCase();
-                        const isActive = normalizedStatus === "active";
-
-                        serviceAction.type = "button";
-                        serviceAction.className = "file-action-button";
-                        serviceAction.textContent = isActive
-                            ? "Stop"
-                            : "Start";
-                        serviceAction.title = isActive
-                            ? "Arrêter ce conteneur"
-                            : "Démarrer ce conteneur";
-
-                        serviceAction.addEventListener("click", () => {
-                            setContainerState(
-                                user,
-                                file,
-                                isActive ? "stop" : "start"
-                            );
-                        });
-
-                        tdBtn.appendChild(serviceAction);
-                    }
-
-
-/*
- * Bouton Supprimer
- */
-
-const deleteBtn = document.createElement("button");
-
-deleteBtn.type = "button";
-deleteBtn.className = "file-action-button";
-deleteBtn.textContent = "Supprimer";
-
-deleteBtn.addEventListener("click", () => {
-    deleteFile(user, file);
-});
-
-tdBtn.appendChild(deleteBtn);
-
-
-tr.appendChild(tdBtn);
-
-table.appendChild(tr);
-
-                }
-            );
-
-
-            section.appendChild(table);
-
-            container.appendChild(section);
-
+            container.appendChild(renderUserSection(user, grouped[user]));
         });
-
 
     setStatus("");
 }
@@ -422,6 +394,8 @@ gid="$(/usr/bin/id -g -- "$1")"
 config="/home/$1/.config"
 containers="/home/$1/.config/containers"
 path="/home/$1/.config/containers/systemd"
+readme_template="${README_TEMPLATE_PATH}"
+readme_target="$path/README.md"
 
 /usr/bin/install -d -m 0755 -o "$uid" -g "$gid" -- "$config"
 /usr/bin/install -d -m 0755 -o "$uid" -g "$gid" -- "$containers"
@@ -429,31 +403,17 @@ path="/home/$1/.config/containers/systemd"
 /usr/bin/chown -- "$uid:$gid" "$config" "$containers" "$path"
 /usr/bin/chmod 0755 -- "$config" "$containers" "$path"
 
-printf '%s\\n' \
-    '# Quadlet Manager' \
-    '' \
-    'Ce dossier contient les fichiers Quadlet utilises par Podman et systemd en mode rootless.' \
-    '' \
-    '## Fonctionnement' \
-    '' \
-    "- Les fichiers '.container' decrivent des conteneurs Podman." \
-    "- Les fichiers '.pod' decrivent des pods Podman." \
-    "- Les fichiers '.kube' decrivent des applications Kubernetes." \
-    "- Les unites sont gerees par le systemd utilisateur." \
-    '' \
-    "Dans l'extension Quadlet Manager, vous pouvez creer, modifier, demarrer, arreter et supprimer les fichiers Quadlet. Le bouton 'Update all' recharge les unites utilisateur, lance 'podman auto-update', puis nettoie les images inutilisees." \
-    '' \
-    "Apres une modification, utilisez 'Enregistrer et redemarrer' pour appliquer la nouvelle configuration d'un fichier '.container'." \
-    > "$path/README.md"
-
-/usr/bin/chown "$uid:$gid" -- "$path/README.md"
-/usr/bin/chmod 0644 -- "$path/README.md"
-/usr/bin/restorecon -- "$containers" "$path" "$path/README.md" 2>/dev/null || true
+[ -f "$readme_template" ]
+/usr/bin/install -o "$uid" -g "$gid" -m 0644 -- "$readme_template" "$readme_target"
+/usr/bin/chown "$uid:$gid" -- "$readme_target"
+/usr/bin/chmod 0644 -- "$readme_target"
+/usr/bin/restorecon -- "$containers" "$path" "$readme_target" 2>/dev/null || true
 
 [ "$(/usr/bin/stat -c '%u:%g' -- "$path")" = "$uid:$gid" ]
 [ "$(/usr/bin/stat -c '%u:%g' -- "$config")" = "$uid:$gid" ]
 [ "$(/usr/bin/stat -c '%u:%g' -- "$containers")" = "$uid:$gid" ]
-[ "$(/usr/bin/stat -c '%u:%g' -- "$path/README.md")" = "$uid:$gid" ]
+[ "$(/usr/bin/stat -c '%u:%g' -- "$readme_target")" = "$uid:$gid" ]
+[ "$(/usr/bin/stat -c '%a' -- "$readme_target")" = "644" ]
 `;
 
     setStatus(`Création du dossier Quadlet de ${user}...`);
@@ -481,48 +441,21 @@ printf '%s\\n' \
 
 function updateAllUser(user) {
 
-    return cockpit.spawn(
-        [
-            "machinectl",
-            "shell",
-            `${user}@`,
-            "/usr/bin/systemctl",
-            "--user",
-            "daemon-reload"
-        ],
-        {
-            superuser: "require",
-            err: "message"
-        }
-    )
-    .then(() => cockpit.spawn(
-        [
-            "machinectl",
-            "shell",
-            `${user}@`,
-            "/usr/bin/podman",
-            "auto-update"
-        ],
-        {
-            superuser: "require",
-            err: "message"
-        }
-    ))
-    .then(() => cockpit.spawn(
-        [
-            "machinectl",
-            "shell",
-            `${user}@`,
-            "/usr/bin/podman",
-            "image",
-            "prune",
-            "-af"
-        ],
-        {
-            superuser: "require",
-            err: "message"
-        }
-    ));
+    return runAsUser(user, [
+        "/usr/bin/systemctl",
+        "--user",
+        "daemon-reload"
+    ])
+    .then(() => runAsUser(user, [
+        "/usr/bin/podman",
+        "auto-update"
+    ]))
+    .then(() => runAsUser(user, [
+        "/usr/bin/podman",
+        "image",
+        "prune",
+        "-af"
+    ]));
 }
 
 function updateAll() {
@@ -620,48 +553,14 @@ function createFile(user) {
      * Récupérer l'UID et le GID de l'utilisateur.
      */
 
-    cockpit.spawn(
-        [
-            "/usr/bin/id",
-            "-u",
-            user
-        ],
-        {
-            superuser: "require",
-            err: "message"
-        }
-    )
-    .then(uidOutput => {
+    getUserId(user)
+    .then(uid => {
+        return getUserGid(user)
+        .then(gid => ({ uid, gid }));
+    })
+    .then(({ uid, gid }) => {
 
-        const uid =
-            uidOutput.trim();
-
-
-        return cockpit.spawn(
-            [
-                "/usr/bin/id",
-                "-g",
-                user
-            ],
-            {
-                superuser: "require",
-                err: "message"
-            }
-        )
-        .then(gidOutput => {
-
-            const gid =
-                gidOutput.trim();
-
-
-            /*
-             * Créer le fichier vide.
-             *
-             * "noclobber" permet de refuser la création si le
-             * fichier existe déjà.
-             */
-
-            const script = `
+        const script = `
 set -C
 : > "$1"
 chown "$2:$3" -- "$1"
@@ -669,22 +568,11 @@ chmod 0644 -- "$1"
 restorecon -- "$1"
 `;
 
-
-            return cockpit.script(
-                script,
-                [
-                    path,
-                    uid,
-                    gid
-                ],
-                {
-                    superuser: "require",
-                    err: "message"
-                }
-            );
-
-        });
-
+        return runScriptWithSuperuser(script, [
+            path,
+            uid,
+            gid
+        ]);
     })
     .then(() => {
 
