@@ -213,6 +213,7 @@ function renderUsers(output) {
 
             const createBtn = document.createElement("button");
             createBtn.type = "button";
+            createBtn.className = "file-action-button";
             createBtn.textContent = "Créer un fichier";
             createBtn.addEventListener("click", () => {
                 createFile(user);
@@ -293,6 +294,7 @@ function renderUsers(output) {
                         document.createElement("button");
 
                     btn.type = "button";
+                    btn.className = "file-action-button";
                     btn.textContent = "Éditer";
 
 
@@ -321,6 +323,7 @@ function renderUsers(output) {
                         const isActive = normalizedStatus === "active";
 
                         serviceAction.type = "button";
+                        serviceAction.className = "file-action-button";
                         serviceAction.textContent = isActive
                             ? "Stop"
                             : "Start";
@@ -347,6 +350,7 @@ function renderUsers(output) {
 const deleteBtn = document.createElement("button");
 
 deleteBtn.type = "button";
+deleteBtn.className = "file-action-button";
 deleteBtn.textContent = "Supprimer";
 
 deleteBtn.addEventListener("click", () => {

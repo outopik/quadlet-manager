@@ -108,18 +108,34 @@ body {
      font-size: 0.9rem;
 }
 
-.action-button {
+.action-button,
+.editor-action-button {
      display: inline-flex;
      align-items: center;
      justify-content: center;
      gap: 8px;
      min-height: 38px;
      padding: 8px 14px;
+     border: 1px solid var(--line);
      border-radius: 7px;
+     color: var(--ink);
+     background: #ffffff;
+     font-family: "Avenir Next", "Segoe UI", sans-serif;
+     font-size: 0.9rem;
      font-weight: 600;
+     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.action-button:disabled {
+.action-button:hover,
+.editor-action-button:hover {
+     border-color: #b9cfe3;
+     background: #f3f8ff;
+     box-shadow: 0 2px 6px rgba(23, 50, 77, 0.08);
+     cursor: pointer;
+}
+
+.action-button:disabled,
+.editor-action-button:disabled {
      cursor: not-allowed;
      opacity: 0.48;
 }
@@ -293,19 +309,24 @@ body {
      font-size: 0.88rem;
 }
 
+.file-action-button,
 .rootless-create-button {
      padding: 6px 10px;
-     border: 1px solid #9acdb7;
+     border: 1px solid var(--line);
      border-radius: 6px;
-     color: #237a58;
+     color: var(--ink);
      background: #ffffff;
+     font-family: "Avenir Next", "Segoe UI", sans-serif;
+     font-size: 0.9rem;
      font-weight: 600;
      white-space: nowrap;
+     cursor: pointer;
 }
 
+.file-action-button:hover,
 .rootless-create-button:hover {
-     color: #ffffff;
-     background: #2d9a70;
+     color: var(--ink);
+     background: #f3f8ff;
 }
 
 .rootless-user:last-child {
@@ -345,9 +366,12 @@ table td:nth-child(2) { width: 16%; white-space: nowrap; }
 table td:nth-child(3) { width: 16%; }
 table td:last-child { width: 18%; text-align: right; white-space: nowrap; }
 
-table button {
+table .file-action-button {
      margin-left: 6px;
+     min-height: 32px;
+     padding: 6px 10px;
      border-radius: 6px;
+     font-size: 0.8rem;
 }
 
 .file-owner {
