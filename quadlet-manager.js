@@ -1,7 +1,8 @@
 
 "use strict";
 
-const README_TEMPLATE_PATH = "/home/nico/Documents/quadlet-manager/README.md";
+const README_TEMPLATE_PATH = "/usr/local/share/cockpit/quadlet-manager/README.user.md";
+const README_TEMPLATE_FALLBACK_PATH = "/home/nico/Documents/quadlet-manager/README.user.md";
 
 const DISCOVER_SCRIPT = `
 for d in /home/*/; do
@@ -395,6 +396,7 @@ config="/home/$1/.config"
 containers="/home/$1/.config/containers"
 path="/home/$1/.config/containers/systemd"
 readme_template="${README_TEMPLATE_PATH}"
+readme_fallback="${README_TEMPLATE_FALLBACK_PATH}"
 readme_target="$path/README.md"
 
 /usr/bin/install -d -m 0755 -o "$uid" -g "$gid" -- "$config"
@@ -403,8 +405,16 @@ readme_target="$path/README.md"
 /usr/bin/chown -- "$uid:$gid" "$config" "$containers" "$path"
 /usr/bin/chmod 0755 -- "$config" "$containers" "$path"
 
-[ -f "$readme_template" ]
-/usr/bin/install -o "$uid" -g "$gid" -m 0644 -- "$readme_template" "$readme_target"
+if [ -f "$readme_template" ]; then
+    readme_source="$readme_template"
+elif [ -f "$readme_fallback" ]; then
+    readme_source="$readme_fallback"
+else
+    readme_source=""
+fi
+
+[ -n "$readme_source" ]
+/usr/bin/install -o "$uid" -g "$gid" -m 0644 -- "$readme_source" "$readme_target"
 /usr/bin/chown "$uid:$gid" -- "$readme_target"
 /usr/bin/chmod 0644 -- "$readme_target"
 /usr/bin/restorecon -- "$containers" "$path" "$readme_target" 2>/dev/null || true
